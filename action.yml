@@ -1,0 +1,85 @@
+name: 'Run PR included Cypress tests on Currents dev'
+description: 'Runs Cypress PR included end-to-end test on Currents dev platform'
+inputs:
+  github_token:
+    description: 'Github token'
+    required: false
+  url:
+    description: "Name of the test url (dev, staging, prod, custom)"
+    required: true
+    default: staging
+  customUrl:
+    description: "Url of custom env (PR deploy, dev/prod env)"
+    required: false
+  base_ref:
+    description: "Target branch of Pull Request"
+    required: true
+  head_ref:
+    description: "Branch of Pull Request"
+    required: true
+  ref:
+    description: "`ref` param for actions/checkout"
+    required: true
+  secret_name:
+    description: "Name of the secret in aws secret manager"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Show action's inputs
+      shell: bash
+      run: |
+        echo "github_token=${{ inputs.github_token }}"
+        echo "url=${{ inputs.url }}"
+        echo "customUrl=${{ inputs.customUrl }}"
+        echo "base_ref=${{ inputs.base_ref }}"
+        echo "head_ref=${{ inputs.head_ref }}"
+        echo "ref=${{ inputs.ref }}"
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        repository: 'Bowery-RES/webapp-ui-automation'
+        token: ${{ inputs.github_token }}
+        ref: ${{ inputs.ref }}
+
+    - name: Installing modules
+      uses: bahmutov/npm-install@v1.8.21
+
+    - name: Define included specs
+      id: define_specs
+      shell: bash
+      run: |
+        git fetch --no-tags --depth=1 origin ${{ inputs.base_ref }}
+        git fetch --no-tags --depth=1 origin ${{ inputs.head_ref }}
+        git checkout origin/${{ inputs.base_ref }}
+        git checkout origin/${{ inputs.head_ref }}
+        git checkout ${{ inputs.ref }}
+        CHANGED_SPECS=$(npx find-cypress-specs --branch ${{ inputs.base_ref }})
+        echo ::set-output name=CHANGED_SPECS::$CHANGED_SPECS
+
+    - name: Set secrets to GH environment
+        if: ${{ !env.ACT }}
+        uses: Bowery-RES/action-aws-secrets@v1.2
+        with:
+          secrets: |
+            ${{ inputs.secret_name }}
+          namespace: false
+
+    - name: Run included specs
+      if: steps.define_specs.outputs.CHANGED_SPECS != null
+      uses: Bowery-RES/action-run-e2e-tests@latest
+      with:
+        github_token: ${{ inputs.github_token }}
+        url: ${{ inputs.url }}
+        customUrl: ${{ inputs.customUrl }}
+        spec_file: ${{ steps.define_specs.outputs.CHANGED_SPECS }}
+        tags: grep=,grepTags=,burn=
+        ref: ${{ inputs.ref }}
+        secret_name: 'Github/Cypress/webapp-e2e-secrets'
+      env:
+        DD_CIVISIBILITY_AGENTLESS_ENABLED: true
+        DD_ENV: ${{ inputs.url }}
+        DD_SERVICE: 'webapp'
