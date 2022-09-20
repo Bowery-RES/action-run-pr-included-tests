@@ -79,7 +79,7 @@ runs:
         spec_file: ${{ steps.define_specs.outputs.CHANGED_SPECS }}
         tags: grep=,grepTags=,burn=
         ref: ${{ inputs.ref }}
-        secret_name: 'Github/Cypress/webapp-e2e-secrets'
+        secret_name: ${{ inputs.secret_name }}
       env:
         DD_CIVISIBILITY_AGENTLESS_ENABLED: true
         DD_ENV: ${{ inputs.url }}
