@@ -26,6 +26,7 @@ inputs:
 
 runs:
   using: "composite"
+  image: boweryautomation/cypress-latest-chrome-latest
   steps:
 
     - name: Show action's inputs
