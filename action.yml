@@ -47,6 +47,10 @@ runs:
     - name: Installing modules
       uses: bahmutov/npm-install@v1.8.21
 
+    - name: Install Currents globally
+      run: npm i @currents/cli -g
+      shell: bash
+
     - name: Define included specs
       id: define_specs
       shell: bash
@@ -60,25 +64,19 @@ runs:
         echo ::set-output name=CHANGED_SPECS::$CHANGED_SPECS
 
     - name: Set secrets to GH environment
-        if: ${{ !env.ACT }}
-        uses: Bowery-RES/action-aws-secrets@v1.2
-        with:
-          secrets: |
-            ${{ inputs.secret_name }}
-          namespace: false
+      if: ${{ !env.ACT }}
+      uses: Bowery-RES/action-aws-secrets@v1.2
+      with:
+        secrets: |
+          ${{ inputs.secret_name }}
+        namespace: false
 
     - name: Run included specs
-      if: steps.define_specs.outputs.CHANGED_SPECS != null
-      uses: Bowery-RES/action-run-e2e-tests@latest
-      with:
-        github_token: ${{ inputs.github_token }}
-        url: ${{ inputs.url }}
-        customUrl: ${{ inputs.customUrl }}
-        spec_file: ${{ steps.define_specs.outputs.CHANGED_SPECS }}
-        tags: grep=,grepTags=,burn=
-        ref: ${{ inputs.ref }}
-        secret_name: ${{ inputs.secret_name }}
+      run: currents run --config-file cypress.config.ts --tag ${{ inputs.url }} --spec ${{ steps.define_specs.outputs.CHANGED_SPECS }} --browser chrome --record --parallel --key ${{ env.CYPRESS_CURRENTS_RECORD_KEY }} --ci-build-id "${{ github.repository }}-${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt}}"
+      shell: bash
       env:
-        DD_CIVISIBILITY_AGENTLESS_ENABLED: true
+        CYPRESS_url: ${{ inputs.url }}
+        CYPRESS_customUrl: ${{ inputs.customUrl == '' && '' ||  inputs.customUrl }}
+        DD_CIVISIBILITY_AGENTLESS_ENABLED: 'true'
         DD_ENV: ${{ inputs.url }}
         DD_SERVICE: 'webapp'
